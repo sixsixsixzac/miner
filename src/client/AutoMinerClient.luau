@@ -6,6 +6,9 @@ type MinerWatch = {
 	model: Model,
 	tweens: { Tween },
 	connection: RBXScriptConnection,
+	lastSyncTime: number,
+	lastTargetX: number?,
+	lastTargetZ: number?,
 }
 
 local watched: { [Model]: MinerWatch } = {}
@@ -15,6 +18,25 @@ local function cancelTweens(watch: MinerWatch)
 		tween:Cancel()
 	end
 	watch.tweens = {}
+end
+
+local function checkSync(watch: MinerWatch)
+	local currentTime = tick()
+	local targetX = watch.model:GetAttribute("TargetX")
+	local targetZ = watch.model:GetAttribute("TargetZ")
+	
+	-- Check if attributes haven't changed for more than 10 seconds
+	if currentTime - watch.lastSyncTime > 10 then
+		if targetX ~= watch.lastTargetX or targetZ ~= watch.lastTargetZ then
+			-- Attributes changed, update sync time
+			watch.lastSyncTime = currentTime
+			watch.lastTargetX = targetX
+			watch.lastTargetZ = targetZ
+		else
+			-- No sync for 10+ seconds, print warning
+			warn("⚠️ AutoMiner sync lost: Server attributes not updating for model", watch.model:GetFullName())
+		end
+	end
 end
 
 local function tweenTo(part: Part, targetCFrame: CFrame, duration: number): Tween
@@ -39,6 +61,9 @@ local function applyTarget(watch: MinerWatch)
 		cancelTweens(watch)
 		return
 	end
+
+	-- Check for sync issues
+	checkSync(watch)
 
 	local pos = body.Position
 	local dx = targetX - pos.X
@@ -94,10 +119,17 @@ local function watchModel(model: Model)
 		return
 	end
 
+	local currentTime = tick()
+	local targetX = model:GetAttribute("TargetX")
+	local targetZ = model:GetAttribute("TargetZ")
+
 	local watch: MinerWatch = {
 		model = model,
 		tweens = {},
 		connection = nil :: any,
+		lastSyncTime = currentTime,
+		lastTargetX = targetX,
+		lastTargetZ = targetZ,
 	}
 
 	watch.connection = model.AttributeChanged:Connect(function(attr)
