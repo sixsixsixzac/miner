@@ -2,6 +2,9 @@ local TweenService = game:GetService("TweenService")
 
 local AutoMinerClient = {}
 
+local SYNC_TIMEOUT = 10
+local SYNC_POLL_INTERVAL = 2
+
 type MinerWatch = {
 	model: Model,
 	tweens: { Tween },
@@ -20,23 +23,10 @@ local function cancelTweens(watch: MinerWatch)
 	watch.tweens = {}
 end
 
-local function checkSync(watch: MinerWatch)
-	local currentTime = tick()
-	local targetX = watch.model:GetAttribute("TargetX")
-	local targetZ = watch.model:GetAttribute("TargetZ")
-	
-	-- Check if attributes haven't changed for more than 10 seconds
-	if currentTime - watch.lastSyncTime > 10 then
-		if targetX ~= watch.lastTargetX or targetZ ~= watch.lastTargetZ then
-			-- Attributes changed, update sync time
-			watch.lastSyncTime = currentTime
-			watch.lastTargetX = targetX
-			watch.lastTargetZ = targetZ
-		else
-			-- No sync for 10+ seconds, print warning
-			warn("⚠️ AutoMiner sync lost: Server attributes not updating for model", watch.model:GetFullName())
-		end
-	end
+local function markSynced(watch: MinerWatch)
+	watch.lastSyncTime = tick()
+	watch.lastTargetX = watch.model:GetAttribute("TargetX")
+	watch.lastTargetZ = watch.model:GetAttribute("TargetZ")
 end
 
 local function tweenTo(part: Part, targetCFrame: CFrame, duration: number): Tween
@@ -62,8 +52,7 @@ local function applyTarget(watch: MinerWatch)
 		return
 	end
 
-	-- Check for sync issues
-	checkSync(watch)
+	markSynced(watch)
 
 	local pos = body.Position
 	local dx = targetX - pos.X
@@ -168,6 +157,25 @@ function AutoMinerClient.start()
 	workspace.ChildRemoved:Connect(function(child)
 		if child:IsA("Model") and child.Name == "AutoMiner" then
 			unwatchModel(child :: Model)
+		end
+	end)
+
+	task.spawn(function()
+		local warned: { [Model]: boolean } = {}
+		while true do
+			task.wait(SYNC_POLL_INTERVAL)
+			local now = tick()
+			for model, watch in pairs(watched) do
+				local speed = model:GetAttribute("Speed")
+				if speed and speed > 0 and now - watch.lastSyncTime > SYNC_TIMEOUT then
+					if not warned[model] then
+						warn("⚠️ AutoMiner sync lost: Server attributes not updating for model", model:GetFullName())
+						warned[model] = true
+					end
+				else
+					warned[model] = nil
+				end
+			end
 		end
 	end)
 end
