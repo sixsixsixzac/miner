@@ -1,0 +1,181 @@
+{
+  "name": "robloxs",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Utils": {
+        "$path": "src/utils"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server",
+        "init": {
+          "$className": "Script"
+        },
+        "caveGenerator": {
+          "$className": "ModuleScript"
+        }
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client",
+          "OreGenerator": {
+            "$className": "ModuleScript"
+          },
+          "OreManager": {
+            "$className": "ModuleScript"
+          },
+          "LoadingScreen": {
+            "$className": "ModuleScript"
+          }
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      },
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Color": [
+            0.38823,
+            0.37254,
+            0.38823
+          ],
+          "Locked": true,
+          "Position": [
+            0,
+            -10,
+            0
+          ],
+          "Size": [
+            512,
+            20,
+            512
+          ]
+        }
+      },
+      "OrePlatforms": {
+        "$className": "Folder",
+        "Slot1": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [0, 5, 0],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot2": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [60, 5, 0],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot3": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [120, 5, 0],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot4": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [180, 5, 0],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot5": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [0, 5, 60],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot6": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [60, 5, 60],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot7": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [120, 5, 60],
+            "Size": [50, 2, 50]
+          }
+        },
+        "Slot8": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [0.5, 0.5, 0.5],
+            "Locked": true,
+            "Material": "Concrete",
+            "Position": [180, 5, 60],
+            "Size": [50, 2, 50]
+          }
+        }
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "Ambient": [
+          0,
+          0,
+          0
+        ],
+        "Brightness": 2,
+        "GlobalShadows": true,
+        "Outlines": false,
+        "Technology": "Voxel"
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}
