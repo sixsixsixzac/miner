@@ -1,8 +1,7 @@
 local HttpService = game:GetService("HttpService")
+local PlayerStats = require(script.Parent:WaitForChild("PlayerStats"))
 
 local Backpack = {}
-
-local MAX_ORE_CAPACITY = 100
 
 export type BackpackEntry = {
 	ores: { [string]: number },
@@ -25,9 +24,11 @@ local function printBackpack(player: Player, entry: BackpackEntry)
 end
 
 function Backpack.set(player: Player)
+	local stats = PlayerStats.get(player)
+	local capacity = (stats and stats.maxBackpackCapacity) or 100
 	backpacks[player] = {
 		ores = {},
-		capacity = MAX_ORE_CAPACITY,
+		capacity = capacity,
 	}
 end
 

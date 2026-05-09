@@ -1,6 +1,6 @@
 local PlayerStats = {}
 
-local stats: { [Player]: { level: number, rebirth: number, luck: number, damage: number, minerSpeed: number, minerDelay: number, maxOreCapacity: number } } = {}
+local stats: { [Player]: { level: number, rebirth: number, luck: number, damage: number, minerSpeed: number, minerDelay: number, maxOreCapacity: number, maxBackpackCapacity: number } } = {}
 
 local DEFAULTS = {
 	level = 1,
@@ -10,9 +10,10 @@ local DEFAULTS = {
 	minerSpeed = 6,
 	minerDelay = 1.5,
 	maxOreCapacity = 10,
+	maxBackpackCapacity = 100,
 }
 
-function PlayerStats.set(player: Player, override: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number?, maxOreCapacity: number? }?)
+function PlayerStats.set(player: Player, override: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number?, maxOreCapacity: number?, maxBackpackCapacity: number? }?)
 	local entry = {
 		level = (override and override.level) or DEFAULTS.level,
 		rebirth = (override and override.rebirth) or DEFAULTS.rebirth,
@@ -21,6 +22,7 @@ function PlayerStats.set(player: Player, override: { level: number?, rebirth: nu
 		minerSpeed = (override and override.minerSpeed) or DEFAULTS.minerSpeed,
 		minerDelay = (override and override.minerDelay) or DEFAULTS.minerDelay,
 		maxOreCapacity = (override and override.maxOreCapacity) or DEFAULTS.maxOreCapacity,
+		maxBackpackCapacity = (override and override.maxBackpackCapacity) or DEFAULTS.maxBackpackCapacity,
 	}
 	stats[player] = entry
 	return entry
@@ -30,7 +32,7 @@ function PlayerStats.get(player: Player)
 	return stats[player]
 end
 
-function PlayerStats.update(player: Player, patch: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number?, maxOreCapacity: number? })
+function PlayerStats.update(player: Player, patch: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number?, maxOreCapacity: number?, maxBackpackCapacity: number? })
 	local entry = stats[player]
 	if not entry then
 		return nil
@@ -55,6 +57,9 @@ function PlayerStats.update(player: Player, patch: { level: number?, rebirth: nu
 	end
 	if patch.maxOreCapacity then
 		entry.maxOreCapacity = patch.maxOreCapacity
+	end
+	if patch.maxBackpackCapacity then
+		entry.maxBackpackCapacity = patch.maxBackpackCapacity
 	end
 	return entry
 end
