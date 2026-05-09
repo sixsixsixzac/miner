@@ -1,5 +1,3 @@
-local TweenService = game:GetService("TweenService")
-
 local OreState = require(script.Parent:WaitForChild("OreState"))
 local PlayerStats = require(script.Parent:WaitForChild("PlayerStats"))
 
@@ -9,15 +7,11 @@ type MinerEntry = {
 	runToken: {},
 	model: Model,
 	body: Part,
-	drill: Part,
-	beamX: Part,
-	beamZ: Part,
-	tweens: { any },
 }
 
 local miners: { [number]: MinerEntry } = {}
 
-local function buildModel(platform: Part, heightAbove: number): (Model, Part, Part, Part, Part)
+local function buildModel(platform: Part, heightAbove: number, initialSpeed: number): (Model, Part)
 	local model = Instance.new("Model")
 	model.Name = "AutoMiner"
 
@@ -108,61 +102,26 @@ local function buildModel(platform: Part, heightAbove: number): (Model, Part, Pa
 	drill.CFrame = CFrame.new(px, topY - 1.5, pz)
 	drill.Parent = model
 
+	model:SetAttribute("TargetX", px)
+	model:SetAttribute("TargetZ", pz)
+	model:SetAttribute("Speed", initialSpeed)
+	model:SetAttribute("ServerOwned", true)
+
 	model.PrimaryPart = body
 	model.Parent = workspace
 
-	return model, body, drill, beamX, beamZ
+	return model, body
 end
 
-local function moveMiner(userId: number, targetX: number, targetZ: number, speed: number)
+local function setMinerTarget(userId: number, targetX: number, targetZ: number, speed: number)
 	local entry = miners[userId]
 	if not entry then
 		return
 	end
 
-	local body = entry.body
-	local currentPos = body.Position
-	local dx = targetX - currentPos.X
-	local dz = targetZ - currentPos.Z
-	local dist = math.sqrt(dx * dx + dz * dz)
-	if dist < 0.01 then
-		return
-	end
-	local duration = dist / speed
-
-	local tweens = {}
-
-	local function addTween(part: Part, cx: number, cy: number, cz: number)
-		local tween = TweenService:Create(
-			part,
-			TweenInfo.new(duration, Enum.EasingStyle.Linear),
-			{ CFrame = CFrame.new(cx, cy, cz) }
-		)
-		table.insert(tweens, tween)
-	end
-
-	local bodyY = body.Position.Y
-	addTween(body, targetX, bodyY, targetZ)
-
-	local drill = entry.drill
-	addTween(drill, targetX, drill.Position.Y, targetZ)
-
-	local beamX = entry.beamX
-	addTween(beamX, beamX.Position.X, beamX.Position.Y, targetZ)
-
-	local beamZ = entry.beamZ
-	addTween(beamZ, targetX, beamZ.Position.Y, beamZ.Position.Z)
-
-	entry.tweens = tweens
-
-	for _, tween in ipairs(tweens) do
-		tween:Play()
-	end
-	task.wait(duration)
-
-	if miners[userId] then
-		miners[userId].tweens = {}
-	end
+	entry.model:SetAttribute("TargetX", targetX)
+	entry.model:SetAttribute("TargetZ", targetZ)
+	entry.model:SetAttribute("Speed", speed)
 end
 
 local function playMineEffect(body: Part)
@@ -171,33 +130,28 @@ local function playMineEffect(body: Part)
 	light.Brightness = 8
 	light.Range = 14
 	light.Parent = body
-	TweenService:Create(light, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Brightness = 0,
-		Range = 0,
-	}):Play()
-	task.delay(0.7, function()
-		if light.Parent then
-			light:Destroy()
-		end
-	end)
+	task.wait(0.6)
+
+	if light.Parent then
+		light:Destroy()
+	end
 end
 
 function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, heightAbove: number)
 	local token = {}
 
-	local model, body, drill, beamX, beamZ = buildModel(platform, heightAbove)
+	local initialStats = PlayerStats.get(player)
+	local initialSpeed = if initialStats then initialStats.minerSpeed else 6
+	local model, body = buildModel(platform, heightAbove, initialSpeed)
 
 	miners[player.UserId] = {
 		runToken = token,
 		model = model,
 		body = body,
-		drill = drill,
-		beamX = beamX,
-		beamZ = beamZ,
-		tweens = {},
 	}
 
 	local platformId = platform.Name
+	local logicalPos = body.Position
 
 	task.spawn(function()
 		while miners[player.UserId] and miners[player.UserId].runToken == token do
@@ -209,7 +163,6 @@ function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, he
 
 			local bestOreId = nil
 			local bestDist = math.huge
-			local bodyPos = body.Position
 
 			for oreId, ore in pairs(world.ores) do
 				if ore.platformId ~= platformId then
@@ -218,8 +171,9 @@ function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, he
 				if ore.state ~= "mineable" then
 					continue
 				end
-				local dx = ore.position.X - bodyPos.X
-				local dz = ore.position.Z - bodyPos.Z
+				local dx = ore.position.X - logicalPos.X
+				local dz = ore.position.Z - logicalPos.Z
+
 				local dist = math.sqrt(dx * dx + dz * dz)
 				if dist < bestDist then
 					bestDist = dist
@@ -228,6 +182,7 @@ function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, he
 			end
 
 			if not bestOreId then
+				setMinerTarget(player.UserId, logicalPos.X, logicalPos.Z, 0)
 				task.wait(0.5)
 				continue
 			end
@@ -246,7 +201,37 @@ function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, he
 				task.wait(0.5)
 				continue
 			end
-			moveMiner(player.UserId, ore.position.X, ore.position.Z, stats.minerSpeed)
+			setMinerTarget(player.UserId, ore.position.X, ore.position.Z, stats.minerSpeed)
+
+			local dx = ore.position.X - logicalPos.X
+			local dz = ore.position.Z - logicalPos.Z
+			local dist = math.sqrt(dx * dx + dz * dz)
+			local duration = dist / stats.minerSpeed
+
+			local elapsed = 0
+			local aborted = false
+			while elapsed < duration do
+				local dt = task.wait(0.1)
+				elapsed += dt
+				if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
+					aborted = true
+					break
+				end
+				local w = getWorld()
+				if not w or not w.ores[bestOreId] or w.ores[bestOreId].state ~= "mineable" then
+					aborted = true
+					break
+				end
+			end
+
+			if aborted then
+				if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
+					break
+				end
+				continue
+			end
+
+			logicalPos = Vector3.new(ore.position.X, logicalPos.Y, ore.position.Z)
 
 			if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
 				break
@@ -278,9 +263,6 @@ function AutoMiner.stop(player: Player)
 		return
 	end
 	miners[player.UserId] = nil
-	for _, tween in ipairs(entry.tweens) do
-		tween:Cancel()
-	end
 	if entry.model then
 		entry.model:Destroy()
 	end

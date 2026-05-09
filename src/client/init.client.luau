@@ -18,6 +18,7 @@ LoadingScreen.setProgress(0.30)
 LoadingScreen.setStatus("กำลังโหลดข้อมูลผู้เล่น...")
 
 local OreGenerator = require(script:WaitForChild("OreGenerator"))
+local AutoMinerClient = require(script:WaitForChild("AutoMinerClient"))
 LoadingScreen.setProgress(0.50)
 
 LoadingScreen.setStatus("กำลังสร้างฉาก...")
@@ -28,6 +29,8 @@ end)
 if not ok then
 	warn(string.format("[Client] OreGenerator.start failed: %s", tostring(err)))
 end
+
+AutoMinerClient.start()
 
 LoadingScreen.setProgress(0.90)
 

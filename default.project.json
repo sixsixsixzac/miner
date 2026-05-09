@@ -28,6 +28,9 @@
       "StarterPlayerScripts": {
         "Client": {
           "$path": "src/client",
+          "init": {
+            "$className": "LocalScript"
+          },
           "OreGenerator": {
             "$className": "ModuleScript"
           },
