@@ -1,32 +1,43 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local RemotesModule = require(Shared:WaitForChild("Remotes"))
+local remotes = RemotesModule.get()
+
+local OreManager = require(script.Parent:WaitForChild("OreManager"))
 
 local AutoMinerClient = {}
 
-local SYNC_TIMEOUT = 10
-local SYNC_POLL_INTERVAL = 2
+local LocalPlayer = Players.LocalPlayer
 
 type MinerWatch = {
 	model: Model,
 	tweens: { Tween },
 	connection: RBXScriptConnection,
-	lastSyncTime: number,
-	lastTargetX: number?,
-	lastTargetZ: number?,
+	ownerLoopRunning: boolean,
 }
 
 local watched: { [Model]: MinerWatch } = {}
+
+local myMinerSpeed: number = 6
+local myMinerDelay: number = 1.5
+
+remotes.MyMinerStats.OnClientEvent:Connect(function(minerSpeed, minerDelay)
+	if typeof(minerSpeed) == "number" then
+		myMinerSpeed = minerSpeed
+	end
+	if typeof(minerDelay) == "number" then
+		myMinerDelay = minerDelay
+	end
+end)
 
 local function cancelTweens(watch: MinerWatch)
 	for _, tween in ipairs(watch.tweens) do
 		tween:Cancel()
 	end
 	watch.tweens = {}
-end
-
-local function markSynced(watch: MinerWatch)
-	watch.lastSyncTime = tick()
-	watch.lastTargetX = watch.model:GetAttribute("TargetX")
-	watch.lastTargetZ = watch.model:GetAttribute("TargetZ")
 end
 
 local function tweenTo(part: Part, targetCFrame: CFrame, duration: number): Tween
@@ -51,8 +62,6 @@ local function applyTarget(watch: MinerWatch)
 		cancelTweens(watch)
 		return
 	end
-
-	markSynced(watch)
 
 	local pos = body.Position
 	local dx = targetX - pos.X
@@ -96,39 +105,147 @@ local function applyTarget(watch: MinerWatch)
 	watch.tweens = newTweens
 end
 
-local function isServerOwned(model: Model): boolean
-	return model:GetAttribute("ServerOwned") == true
+local function isOwnedByLocalPlayer(model: Model): boolean
+	return model:GetAttribute("OwnerUserId") == LocalPlayer.UserId
+end
+
+local function isOnPlatform(orePos: Vector3, platform: BasePart): boolean
+	local pp = platform.Position
+	local ps = platform.Size
+	local hx = ps.X / 2
+	local hz = ps.Z / 2
+	return orePos.X >= pp.X - hx
+		and orePos.X <= pp.X + hx
+		and orePos.Z >= pp.Z - hz
+		and orePos.Z <= pp.Z + hz
+end
+
+local function findNearestMineable(bodyPos: Vector3, platform: BasePart?): (number?, number)
+	local bestId: number? = nil
+	local bestDist = math.huge
+	for oreId, entry in pairs(OreManager.all()) do
+		if not entry.isMineable or not entry.part or not entry.part.Parent then
+			continue
+		end
+		local p = entry.part.Position
+		if platform and not isOnPlatform(p, platform) then
+			continue
+		end
+		local dx = p.X - bodyPos.X
+		local dz = p.Z - bodyPos.Z
+		local dist = math.sqrt(dx * dx + dz * dz)
+		if dist < bestDist then
+			bestDist = dist
+			bestId = oreId
+		end
+	end
+	return bestId, bestDist
+end
+
+local function runOwnerLoop(watch: MinerWatch)
+	if watch.ownerLoopRunning then
+		return
+	end
+	watch.ownerLoopRunning = true
+
+	task.spawn(function()
+		local model = watch.model
+		local platform = model.Parent and model.Parent:IsA("BasePart") and model.Parent :: BasePart or nil
+
+		while watched[model] == watch and model.Parent do
+			local body = model:FindFirstChild("Body") :: Part
+			if not body then
+				task.wait(0.3)
+				continue
+			end
+
+			local minerSpeed = myMinerSpeed
+			local minerDelay = myMinerDelay
+
+			local bestId, bestDist = findNearestMineable(body.Position, platform)
+
+			if not bestId then
+				remotes.SetMinerTarget:FireServer(body.Position.X, body.Position.Z, 0)
+				task.wait(0.5)
+				continue
+			end
+
+			local targetEntry = OreManager.get(bestId)
+			if not targetEntry or not targetEntry.part then
+				task.wait(0.1)
+				continue
+			end
+			local targetPos = targetEntry.part.Position
+
+			remotes.SetMinerTarget:FireServer(targetPos.X, targetPos.Z, minerSpeed)
+
+			local duration = bestDist / minerSpeed
+			local elapsed = 0
+			local aborted = false
+			while elapsed < duration do
+				local dt = task.wait(0.1)
+				elapsed += dt
+				if watched[model] ~= watch or not model.Parent then
+					aborted = true
+					break
+				end
+				local cur = OreManager.get(bestId)
+				if not cur or not cur.isMineable then
+					aborted = true
+					break
+				end
+			end
+
+			if aborted then
+				continue
+			end
+
+			task.wait(minerDelay)
+
+			if watched[model] ~= watch or not model.Parent then
+				break
+			end
+
+			local cur = OreManager.get(bestId)
+			if cur and cur.isMineable then
+				task.spawn(function()
+					pcall(function()
+						remotes.MineOre:InvokeServer(bestId)
+					end)
+				end)
+			end
+		end
+
+		watch.ownerLoopRunning = false
+	end)
 end
 
 local function watchModel(model: Model)
 	if watched[model] then
 		return
 	end
-	if not isServerOwned(model) then
-		return
-	end
-
-	local currentTime = tick()
-	local targetX = model:GetAttribute("TargetX")
-	local targetZ = model:GetAttribute("TargetZ")
 
 	local watch: MinerWatch = {
 		model = model,
 		tweens = {},
 		connection = nil :: any,
-		lastSyncTime = currentTime,
-		lastTargetX = targetX,
-		lastTargetZ = targetZ,
+		ownerLoopRunning = false,
 	}
 
 	watch.connection = model.AttributeChanged:Connect(function(attr)
 		if attr == "TargetX" or attr == "TargetZ" or attr == "Speed" then
 			applyTarget(watch)
+		elseif attr == "OwnerUserId" and isOwnedByLocalPlayer(model) then
+			runOwnerLoop(watch)
 		end
 	end)
 
 	watched[model] = watch
 	applyTarget(watch)
+
+	if isOwnedByLocalPlayer(model) then
+		runOwnerLoop(watch)
+	end
 end
 
 local function unwatchModel(model: Model)
@@ -142,40 +259,21 @@ local function unwatchModel(model: Model)
 end
 
 function AutoMinerClient.start()
-	for _, child in ipairs(workspace:GetChildren()) do
-		if child:IsA("Model") and child.Name == "AutoMiner" then
-			watchModel(child :: Model)
+	for _, descendant in ipairs(workspace:GetDescendants()) do
+		if descendant:IsA("Model") and descendant.Name == "AutoMiner" then
+			watchModel(descendant :: Model)
 		end
 	end
 
-	workspace.ChildAdded:Connect(function(child)
-		if child:IsA("Model") and child.Name == "AutoMiner" then
-			watchModel(child :: Model)
+	workspace.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("Model") and descendant.Name == "AutoMiner" then
+			watchModel(descendant :: Model)
 		end
 	end)
 
-	workspace.ChildRemoved:Connect(function(child)
-		if child:IsA("Model") and child.Name == "AutoMiner" then
-			unwatchModel(child :: Model)
-		end
-	end)
-
-	task.spawn(function()
-		local warned: { [Model]: boolean } = {}
-		while true do
-			task.wait(SYNC_POLL_INTERVAL)
-			local now = tick()
-			for model, watch in pairs(watched) do
-				local speed = model:GetAttribute("Speed")
-				if speed and speed > 0 and now - watch.lastSyncTime > SYNC_TIMEOUT then
-					if not warned[model] then
-						warn("⚠️ AutoMiner sync lost: Server attributes not updating for model", model:GetFullName())
-						warned[model] = true
-					end
-				else
-					warned[model] = nil
-				end
-			end
+	workspace.DescendantRemoving:Connect(function(descendant)
+		if descendant:IsA("Model") and descendant.Name == "AutoMiner" then
+			unwatchModel(descendant :: Model)
 		end
 	end)
 end

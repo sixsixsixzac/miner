@@ -8,6 +8,8 @@ local REMOTE_EVENTS = {
 	"OreMineable",
 	"OreDamaged",
 	"OreDestroyed",
+	"SetMinerTarget",
+	"MyMinerStats",
 }
 
 local REMOTE_FUNCTIONS = {

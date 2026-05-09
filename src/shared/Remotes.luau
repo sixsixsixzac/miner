@@ -11,6 +11,8 @@ local cached: {
 	OreMineable: RemoteEvent,
 	OreDamaged: RemoteEvent,
 	OreDestroyed: RemoteEvent,
+	SetMinerTarget: RemoteEvent,
+	MyMinerStats: RemoteEvent,
 	OreSnapshot: RemoteFunction,
 	MineOre: RemoteFunction,
 }? = nil
@@ -51,6 +53,8 @@ local function buildCache(folder: Folder)
 		OreMineable = folder:WaitForChild("OreMineable") :: RemoteEvent,
 		OreDamaged = folder:WaitForChild("OreDamaged") :: RemoteEvent,
 		OreDestroyed = folder:WaitForChild("OreDestroyed") :: RemoteEvent,
+		SetMinerTarget = folder:WaitForChild("SetMinerTarget") :: RemoteEvent,
+		MyMinerStats = folder:WaitForChild("MyMinerStats") :: RemoteEvent,
 		OreSnapshot = folder:WaitForChild("OreSnapshot") :: RemoteFunction,
 		MineOre = folder:WaitForChild("MineOre") :: RemoteFunction,
 	}

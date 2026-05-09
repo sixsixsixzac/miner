@@ -1,17 +1,21 @@
-local OreState = require(script.Parent:WaitForChild("OreState"))
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local RemotesModule = require(Shared:WaitForChild("Remotes"))
+local Remotes = RemotesModule.get()
+
 local PlayerStats = require(script.Parent:WaitForChild("PlayerStats"))
 
 local AutoMiner = {}
 
 type MinerEntry = {
-	runToken: {},
 	model: Model,
 	body: Part,
 }
 
 local miners: { [number]: MinerEntry } = {}
 
-local function buildModel(platform: Part, heightAbove: number, initialSpeed: number): (Model, Part)
+local function buildModel(platform: Part, heightAbove: number, ownerUserId: number, level: number): (Model, Part)
 	local model = Instance.new("Model")
 	model.Name = "AutoMiner"
 
@@ -81,181 +85,156 @@ local function buildModel(platform: Part, heightAbove: number, initialSpeed: num
 	railPZ.CFrame = CFrame.new(px, topY + 0.75, pz + halfZ)
 	railPZ.Parent = model
 
-	local body = Instance.new("Part")
-	body.Name = "Body"
-	body.Size = Vector3.new(2, 2, 2)
-	body.Color = Color3.fromRGB(40, 40, 40)
-	body.Material = Enum.Material.Metal
-	body.Anchored = true
-	body.CanCollide = false
-	body.CFrame = CFrame.new(px, topY, pz)
-	body.Parent = model
+	local body: Part
+	local drill: Part
 
-	local drill = Instance.new("Part")
-	drill.Name = "Drill"
-	drill.Size = Vector3.new(0.6, 2.5, 0.6)
-	drill.Color = Color3.fromRGB(0, 255, 200)
-	drill.Material = Enum.Material.Neon
-	drill.Anchored = true
-	drill.CanCollide = false
-	drill.Transparency = 0.3
-	drill.CFrame = CFrame.new(px, topY - 1.5, pz)
-	drill.Parent = model
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	if assets then
+		local minerModels = assets:FindFirstChild("MinerModels")
+		if minerModels then
+			local bodysFolder = minerModels:FindFirstChild("Bodys")
+			local drillsFolder = minerModels:FindFirstChild("Drills")
+
+			local levelStr = tostring(level)
+			local bodyTemplate = bodysFolder and bodysFolder:FindFirstChild("Body_" .. levelStr)
+			local drillTemplate = drillsFolder and drillsFolder:FindFirstChild("Drill_" .. levelStr)
+
+			if bodyTemplate and bodyTemplate:IsA("BasePart") then
+				body = bodyTemplate:Clone()
+				body.Name = "Body"
+				body.Anchored = true
+				body.CanCollide = false
+				body.CFrame = CFrame.new(px, topY, pz)
+				body.Parent = model
+			elseif bodyTemplate and bodyTemplate:IsA("Model") then
+				local clone = bodyTemplate:Clone()
+				for _, desc in ipairs(clone:GetDescendants()) do
+					if desc:IsA("BasePart") then
+						desc.Anchored = true
+						desc.CanCollide = false
+					end
+				end
+				clone:PivotTo(CFrame.new(px, topY, pz))
+				local part = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
+				if part then
+					part.Name = "Body"
+					part.Parent = model
+					body = part
+				end
+				clone:Destroy()
+			else
+				body = Instance.new("Part")
+				body.Name = "Body"
+				body.Size = Vector3.new(2, 2, 2)
+				body.Color = Color3.fromRGB(40, 40, 40)
+				body.Material = Enum.Material.Metal
+				body.Anchored = true
+				body.CanCollide = false
+				body.CFrame = CFrame.new(px, topY, pz)
+				body.Parent = model
+			end
+
+			if drillTemplate and drillTemplate:IsA("BasePart") then
+				drill = drillTemplate:Clone()
+				drill.Name = "Drill"
+				drill.Anchored = true
+				drill.CanCollide = false
+				drill.CFrame = CFrame.new(px, topY - 1.5, pz)
+				drill.Parent = model
+			elseif drillTemplate and drillTemplate:IsA("Model") then
+				local clone = drillTemplate:Clone()
+				for _, desc in ipairs(clone:GetDescendants()) do
+					if desc:IsA("BasePart") then
+						desc.Anchored = true
+						desc.CanCollide = false
+					end
+				end
+				clone:PivotTo(CFrame.new(px, topY - 1.5, pz))
+				local part = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
+				if part then
+					part.Name = "Drill"
+					part.Parent = model
+					drill = part
+				end
+				clone:Destroy()
+			else
+				drill = Instance.new("Part")
+				drill.Name = "Drill"
+				drill.Size = Vector3.new(0.6, 2.5, 0.6)
+				drill.Color = Color3.fromRGB(0, 255, 200)
+				drill.Material = Enum.Material.Neon
+				drill.Anchored = true
+				drill.CanCollide = false
+				drill.Transparency = 0.3
+				drill.CFrame = CFrame.new(px, topY - 1.5, pz)
+				drill.Parent = model
+			end
+		else
+			body = Instance.new("Part")
+			body.Name = "Body"
+			body.Size = Vector3.new(2, 2, 2)
+			body.Color = Color3.fromRGB(40, 40, 40)
+			body.Material = Enum.Material.Metal
+			body.Anchored = true
+			body.CanCollide = false
+			body.CFrame = CFrame.new(px, topY, pz)
+			body.Parent = model
+
+			drill = Instance.new("Part")
+			drill.Name = "Drill"
+			drill.Size = Vector3.new(0.6, 2.5, 0.6)
+			drill.Color = Color3.fromRGB(0, 255, 200)
+			drill.Material = Enum.Material.Neon
+			drill.Anchored = true
+			drill.CanCollide = false
+			drill.Transparency = 0.3
+			drill.CFrame = CFrame.new(px, topY - 1.5, pz)
+			drill.Parent = model
+		end
+	else
+		body = Instance.new("Part")
+		body.Name = "Body"
+		body.Size = Vector3.new(2, 2, 2)
+		body.Color = Color3.fromRGB(40, 40, 40)
+		body.Material = Enum.Material.Metal
+		body.Anchored = true
+		body.CanCollide = false
+		body.CFrame = CFrame.new(px, topY, pz)
+		body.Parent = model
+
+		drill = Instance.new("Part")
+		drill.Name = "Drill"
+		drill.Size = Vector3.new(0.6, 2.5, 0.6)
+		drill.Color = Color3.fromRGB(0, 255, 200)
+		drill.Material = Enum.Material.Neon
+		drill.Anchored = true
+		drill.CanCollide = false
+		drill.Transparency = 0.3
+		drill.CFrame = CFrame.new(px, topY - 1.5, pz)
+		drill.Parent = model
+	end
 
 	model:SetAttribute("TargetX", px)
 	model:SetAttribute("TargetZ", pz)
-	model:SetAttribute("Speed", initialSpeed)
-	model:SetAttribute("ServerOwned", true)
+	model:SetAttribute("Speed", 0)
+	model:SetAttribute("OwnerUserId", ownerUserId)
 
 	model.PrimaryPart = body
-	model.Parent = workspace
+	model.Parent = platform
 
 	return model, body
 end
 
-local function setMinerTarget(userId: number, targetX: number, targetZ: number, speed: number)
-	local entry = miners[userId]
-	if not entry then
-		return
-	end
+function AutoMiner.start(player: Player, platform: Part, heightAbove: number)
+	local stats = PlayerStats.get(player)
+	local playerLevel = if stats then stats.level else 1
 
-	entry.model:SetAttribute("TargetX", targetX)
-	entry.model:SetAttribute("TargetZ", targetZ)
-	entry.model:SetAttribute("Speed", speed)
-end
-
-local function playMineEffect(body: Part)
-	local light = Instance.new("PointLight")
-	light.Color = Color3.fromRGB(0, 255, 200)
-	light.Brightness = 8
-	light.Range = 14
-	light.Parent = body
-	task.wait(0.6)
-
-	if light.Parent then
-		light:Destroy()
-	end
-end
-
-function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, heightAbove: number)
-	local token = {}
-
-	local initialStats = PlayerStats.get(player)
-	local initialSpeed = if initialStats then initialStats.minerSpeed else 6
-	local model, body = buildModel(platform, heightAbove, initialSpeed)
+	local model, body = buildModel(platform, heightAbove, player.UserId, playerLevel)
 
 	miners[player.UserId] = {
-		runToken = token,
 		model = model,
 		body = body,
 	}
-
-	local platformId = platform.Name
-	local logicalPos = body.Position
-
-	task.spawn(function()
-		while miners[player.UserId] and miners[player.UserId].runToken == token do
-			local world = getWorld()
-			if not world then
-				task.wait(0.5)
-				continue
-			end
-
-			local bestOreId = nil
-			local bestDist = math.huge
-
-			for oreId, ore in pairs(world.ores) do
-				if ore.platformId ~= platformId then
-					continue
-				end
-				if ore.state ~= "mineable" then
-					continue
-				end
-				local dx = ore.position.X - logicalPos.X
-				local dz = ore.position.Z - logicalPos.Z
-
-				local dist = math.sqrt(dx * dx + dz * dz)
-				if dist < bestDist then
-					bestDist = dist
-					bestOreId = oreId
-				end
-			end
-
-			if not bestOreId then
-				setMinerTarget(player.UserId, logicalPos.X, logicalPos.Z, 0)
-				task.wait(0.5)
-				continue
-			end
-
-			if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
-				break
-			end
-
-			local ore = world.ores[bestOreId]
-			if not ore then
-				continue
-			end
-
-			local stats = PlayerStats.get(player)
-			if not stats then
-				task.wait(0.5)
-				continue
-			end
-			setMinerTarget(player.UserId, ore.position.X, ore.position.Z, stats.minerSpeed)
-
-			local dx = ore.position.X - logicalPos.X
-			local dz = ore.position.Z - logicalPos.Z
-			local dist = math.sqrt(dx * dx + dz * dz)
-			local duration = dist / stats.minerSpeed
-
-			local elapsed = 0
-			local aborted = false
-			while elapsed < duration do
-				local dt = task.wait(0.1)
-				elapsed += dt
-				if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
-					aborted = true
-					break
-				end
-				local w = getWorld()
-				if not w or not w.ores[bestOreId] or w.ores[bestOreId].state ~= "mineable" then
-					aborted = true
-					break
-				end
-			end
-
-			logicalPos = Vector3.new(ore.position.X, logicalPos.Y, ore.position.Z)
-
-			if aborted then
-				if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
-					break
-				end
-				setMinerTarget(player.UserId, logicalPos.X, logicalPos.Z, 0)
-				continue
-			end
-
-			if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
-				break
-			end
-
-			task.wait(stats.minerDelay)
-
-			if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
-				break
-			end
-
-			playMineEffect(body)
-
-			local currentWorld = getWorld()
-			if currentWorld and currentWorld.ores[bestOreId] and currentWorld.ores[bestOreId].state == "mineable" then
-				OreState.tryMine(player, bestOreId)
-			end
-		end
-
-		if miners[player.UserId] and miners[player.UserId].model then
-			miners[player.UserId].model:Destroy()
-		end
-	end)
 end
 
 function AutoMiner.stop(player: Player)
@@ -268,5 +247,36 @@ function AutoMiner.stop(player: Player)
 		entry.model:Destroy()
 	end
 end
+
+function AutoMiner.broadcastStats(player: Player)
+	local stats = PlayerStats.get(player)
+	if not stats then
+		return
+	end
+	Remotes.MyMinerStats:FireClient(player, stats.minerSpeed, stats.minerDelay)
+end
+
+function AutoMiner.updateStats(player: Player)
+	if not miners[player.UserId] then
+		return
+	end
+	AutoMiner.broadcastStats(player)
+end
+
+Remotes.SetMinerTarget.OnServerEvent:Connect(function(player, targetX, targetZ, speed)
+	if typeof(targetX) ~= "number" or typeof(targetZ) ~= "number" or typeof(speed) ~= "number" then
+		return
+	end
+	if targetX ~= targetX or targetZ ~= targetZ or speed ~= speed then
+		return
+	end
+	local entry = miners[player.UserId]
+	if not entry then
+		return
+	end
+	entry.model:SetAttribute("TargetX", targetX)
+	entry.model:SetAttribute("TargetZ", targetZ)
+	entry.model:SetAttribute("Speed", math.max(0, speed))
+end)
 
 return AutoMiner

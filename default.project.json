@@ -9,6 +9,18 @@
       },
       "Utils": {
         "$path": "src/utils"
+      },
+      "Assets": {
+        "$className": "Folder",
+        "MinerModels": {
+          "$className": "Folder",
+          "Bodys": {
+            "$className": "Folder"
+          },
+          "Drills": {
+            "$className": "Folder"
+          }
+        }
       }
     },
 

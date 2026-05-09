@@ -10,6 +10,7 @@ local OreState = require(script:WaitForChild("OreState"))
 local PlayerStats = require(script:WaitForChild("PlayerStats"))
 local AutoMiner = require(script:WaitForChild("AutoMiner"))
 local Backpack = require(script:WaitForChild("Backpack"))
+require(script:WaitForChild("Leaderboard"))
 
 local config = {
 	gridSpacing = 4,
@@ -17,11 +18,10 @@ local config = {
 	riseDuration = 2,
 	spawnDelay = 0.1,
 	spawnChance = 1.0,
-	maxBlocks = 10,
 	regenerationDelay = 5,
-	autoMinerSpeed = 12,
 	autoMinerDelay = 1.5,
 	autoMinerHeight = 12,
+	debug = true,
 }
 
 Config.setDebug(config.debug or false)
@@ -54,7 +54,7 @@ local function onPlayerAdded(player: Player)
 	end
 
 	if platform then
-		AutoMiner.start(player, platform, OreState.getSharedWorld, config.autoMinerHeight)
+		AutoMiner.start(player, platform, config.autoMinerHeight)
 	end
 
 	if player.Character then
@@ -82,7 +82,9 @@ Remotes.OreSnapshot.OnServerInvoke = function(player)
 	if not OreState.getPlayerPlatform(player) then
 		OreState.beginPlayer(player)
 	end
-	return OreState.snapshotFor(player)
+	local snapshot = OreState.snapshotFor(player)
+	AutoMiner.broadcastStats(player)
+	return snapshot
 end
 
 Remotes.MineOre.OnServerInvoke = function(player, oreId)
