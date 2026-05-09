@@ -4,10 +4,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local RemotesModule = require(Shared:WaitForChild("Remotes"))
 local Remotes = RemotesModule.get()
+local Config = require(Shared:WaitForChild("Config"))
 
 local OreState = require(script:WaitForChild("OreState"))
 local PlayerStats = require(script:WaitForChild("PlayerStats"))
 local AutoMiner = require(script:WaitForChild("AutoMiner"))
+local Backpack = require(script:WaitForChild("Backpack"))
 
 local config = {
 	gridSpacing = 4,
@@ -21,6 +23,8 @@ local config = {
 	autoMinerDelay = 1.5,
 	autoMinerHeight = 12,
 }
+
+Config.setDebug(config.debug or false)
 
 OreState.init(config)
 
@@ -39,6 +43,7 @@ end
 
 local function onPlayerAdded(player: Player)
 	PlayerStats.set(player, nil)
+	Backpack.set(player)
 	local platform = OreState.beginPlayer(player)
 
 	local function onCharacter()
@@ -67,6 +72,7 @@ Players.PlayerRemoving:Connect(function(player)
 	AutoMiner.stop(player)
 	OreState.endPlayer(player)
 	PlayerStats.remove(player)
+	Backpack.remove(player)
 end)
 
 Remotes.OreSnapshot.OnServerInvoke = function(player)

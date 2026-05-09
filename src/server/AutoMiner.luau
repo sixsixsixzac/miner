@@ -224,14 +224,15 @@ function AutoMiner.start(player: Player, platform: Part, getWorld: () -> any, he
 				end
 			end
 
+			logicalPos = Vector3.new(ore.position.X, logicalPos.Y, ore.position.Z)
+
 			if aborted then
 				if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
 					break
 				end
+				setMinerTarget(player.UserId, logicalPos.X, logicalPos.Z, 0)
 				continue
 			end
-
-			logicalPos = Vector3.new(ore.position.X, logicalPos.Y, ore.position.Z)
 
 			if miners[player.UserId] == nil or miners[player.UserId].runToken ~= token then
 				break

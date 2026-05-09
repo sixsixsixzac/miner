@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local OreTypes = require(Shared:WaitForChild("OreTypes"))
+local Config = require(Shared:WaitForChild("Config"))
 local RemotesModule = require(Shared:WaitForChild("Remotes"))
 
 local OreManager = require(script.Parent:WaitForChild("OreManager"))
@@ -43,17 +44,23 @@ end
 
 local function handleOreClick(oreId: number, entry)
 	if not entry.isMineable then
-		print(string.format("[OreClient] mine blocked (not mineable yet) id=%d type=%s", oreId, entry.type))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreClient] mine blocked (not mineable yet) id=%d type=%s", oreId, entry.type))
+		end
 		return
 	end
-	print(string.format("[OreClient] mine request id=%d type=%s", oreId, entry.type))
+	if Config.isDebugEnabled() then
+		print(string.format("[OreClient] mine request id=%d type=%s", oreId, entry.type))
+	end
 	local ok, result = pcall(function()
 		return Remotes.MineOre:InvokeServer(oreId)
 	end)
 	if not ok then
 		warn(string.format("[OreClient] MineOre invoke errored id=%d err=%s", oreId, tostring(result)))
 	else
-		print(string.format("[OreClient] mine response id=%d accepted=%s", oreId, tostring(result)))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreClient] mine response id=%d accepted=%s", oreId, tostring(result)))
+		end
 	end
 end
 
@@ -255,7 +262,9 @@ local function handleDestroyed(oreId: number, byPlayer: Player?)
 	local entry = OreManager.get(oreId)
 	local typeStr = entry and entry.type or "?"
 	local byName = if typeof(byPlayer) == "Instance" and byPlayer:IsA("Player") then byPlayer.Name else "?"
-	print(string.format("[OreClient] mined id=%d type=%s by=%s", oreId, typeStr, byName))
+	if Config.isDebugEnabled() then
+		print(string.format("[OreClient] mined id=%d type=%s by=%s", oreId, typeStr, byName))
+	end
 	OreManager.remove(oreId)
 end
 

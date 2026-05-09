@@ -1,6 +1,6 @@
 local PlayerStats = {}
 
-local stats: { [Player]: { level: number, rebirth: number, luck: number, damage: number, minerSpeed: number, minerDelay: number } } = {}
+local stats: { [Player]: { level: number, rebirth: number, luck: number, damage: number, minerSpeed: number, minerDelay: number, maxOreCapacity: number } } = {}
 
 local DEFAULTS = {
 	level = 1,
@@ -9,9 +9,10 @@ local DEFAULTS = {
 	damage = 1,
 	minerSpeed = 6,
 	minerDelay = 1.5,
+	maxOreCapacity = 10,
 }
 
-function PlayerStats.set(player: Player, override: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number? }?)
+function PlayerStats.set(player: Player, override: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number?, maxOreCapacity: number? }?)
 	local entry = {
 		level = (override and override.level) or DEFAULTS.level,
 		rebirth = (override and override.rebirth) or DEFAULTS.rebirth,
@@ -19,6 +20,7 @@ function PlayerStats.set(player: Player, override: { level: number?, rebirth: nu
 		damage = (override and override.damage) or DEFAULTS.damage,
 		minerSpeed = (override and override.minerSpeed) or DEFAULTS.minerSpeed,
 		minerDelay = (override and override.minerDelay) or DEFAULTS.minerDelay,
+		maxOreCapacity = (override and override.maxOreCapacity) or DEFAULTS.maxOreCapacity,
 	}
 	stats[player] = entry
 	return entry
@@ -28,7 +30,7 @@ function PlayerStats.get(player: Player)
 	return stats[player]
 end
 
-function PlayerStats.update(player: Player, patch: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number? })
+function PlayerStats.update(player: Player, patch: { level: number?, rebirth: number?, luck: number?, damage: number?, minerSpeed: number?, minerDelay: number?, maxOreCapacity: number? })
 	local entry = stats[player]
 	if not entry then
 		return nil
@@ -50,6 +52,9 @@ function PlayerStats.update(player: Player, patch: { level: number?, rebirth: nu
 	end
 	if patch.minerDelay then
 		entry.minerDelay = patch.minerDelay
+	end
+	if patch.maxOreCapacity then
+		entry.maxOreCapacity = patch.maxOreCapacity
 	end
 	return entry
 end

@@ -1,11 +1,14 @@
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local OreTypes = require(Shared:WaitForChild("OreTypes"))
+local Config = require(Shared:WaitForChild("Config"))
 local RemotesModule = require(Shared:WaitForChild("Remotes"))
 local Remotes = RemotesModule.get()
 
 local PlayerStats = require(script.Parent:WaitForChild("PlayerStats"))
+local Backpack = require(script.Parent:WaitForChild("Backpack"))
 
 local OreState = {}
 
@@ -95,16 +98,19 @@ local function activeCount(platformId: string): number
 end
 
 local function shouldSpawn(platformId: string): boolean
-	if activeCount(platformId) >= config.maxBlocks then
-		return false
-	end
 	local platformData = sharedWorld.platforms[platformId]
 	if not platformData then
 		return false
 	end
 	local player = platformData.player
 	local stats = PlayerStats.get(player)
-	local luck = (stats and stats.luck) or 1.0
+	if not stats then
+		return false
+	end
+	if activeCount(platformId) >= stats.maxOreCapacity then
+		return false
+	end
+	local luck = stats.luck or 1.0
 	local adjusted = math.min(config.spawnChance * luck, 1.0)
 	return math.random() <= adjusted
 end
@@ -287,36 +293,50 @@ end
 
 function OreState.tryMine(player: Player, oreId: number): boolean
 	if typeof(oreId) ~= "number" then
-		print(string.format("[OreServer] mine reject player=%s reason=bad-id value=%s", player.Name, tostring(oreId)))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s reason=bad-id value=%s", player.Name, tostring(oreId)))
+		end
 		return false
 	end
 	if not sharedWorld then
-		print(string.format("[OreServer] mine reject player=%s id=%d reason=no-world", player.Name, oreId))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s id=%d reason=no-world", player.Name, oreId))
+		end
 		return false
 	end
 	local entry = sharedWorld.ores[oreId]
 	if not entry then
-		print(string.format("[OreServer] mine reject player=%s id=%d reason=unknown-id", player.Name, oreId))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s id=%d reason=unknown-id", player.Name, oreId))
+		end
 		return false
 	end
 
 	local playerPlatform = playerPlatforms[player.UserId]
 	if not playerPlatform or playerPlatform.Name ~= entry.platformId then
-		print(string.format("[OreServer] mine reject player=%s id=%d reason=not-owner", player.Name, oreId))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s id=%d reason=not-owner", player.Name, oreId))
+		end
 		return false
 	end
 
 	if entry.state ~= "mineable" then
-		print(string.format("[OreServer] mine reject player=%s id=%d type=%s reason=state-%s", player.Name, oreId, entry.type, entry.state))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s id=%d type=%s reason=state-%s", player.Name, oreId, entry.type, entry.state))
+		end
 		return false
 	end
 	local stats = PlayerStats.get(player)
 	if not stats then
-		print(string.format("[OreServer] mine reject player=%s id=%d reason=no-stats", player.Name, oreId))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s id=%d reason=no-stats", player.Name, oreId))
+		end
 		return false
 	end
 	if not OreTypes.canPlayerMine(stats.level, stats.rebirth, entry.type) then
-		print(string.format("[OreServer] mine reject player=%s id=%d type=%s reason=gated lvl=%d reb=%d", player.Name, oreId, entry.type, stats.level, stats.rebirth))
+		if Config.isDebugEnabled() then
+			print(string.format("[OreServer] mine reject player=%s id=%d type=%s reason=gated lvl=%d reb=%d", player.Name, oreId, entry.type, stats.level, stats.rebirth))
+		end
 		return false
 	end
 
@@ -338,7 +358,10 @@ function OreState.tryMine(player: Player, oreId: number): boolean
 		platformId = platformId,
 	}
 
-	print(string.format("[OreServer] mined player=%s id=%d type=%s slot=%d", player.Name, oreId, entry.type, slotIndex))
+	if config.debug then
+		print(string.format("[OreServer] mined player=%s id=%d type=%s slot=%d", player.Name, oreId, entry.type, slotIndex))
+	end
+	Backpack.addOre(player, entry.type, 1)
 	Remotes.OreDestroyed:FireAllClients(oreId, player)
 	return true
 end
